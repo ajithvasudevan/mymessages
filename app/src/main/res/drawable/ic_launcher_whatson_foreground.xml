@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- checklist glyph for the "What's On" shortcut icon -->
+    <group android:scaleX="2.4" android:scaleY="2.4" android:translateX="25.2" android:translateY="25.2">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M3,5h2v2H3zM7,5h14v2H7zM3,11h2v2H3zM7,11h14v2H7zM3,17h2v2H3zM7,17h14v2H7z" />
+    </group>
+</vector>

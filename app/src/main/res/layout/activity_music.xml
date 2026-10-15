@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0B0B0D">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="24dp"
+            android:paddingBottom="16dp">
+
+            <!-- Pick & Play: fills the space freed by the removed album art. There is NO
+                 speaker dropdown (unlike the dashboard card) — the target speaker is the one
+                 this overlay is already showing / the room chips below. Album + track lists are
+                 pushed from HA (pnp_albums / pnp_tracks in the music refresh) and a selection
+                 is sent back on lockdash/cmd {action:"pnp", ...} which reuses the SAME backend
+                 as the Multimedia dashboard's Pick & Play card. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/container_bg">
+
+                <!-- Collapsible header: a FULL-WIDTH tap target (its own padding, so the whole top
+                     strip of the card toggles, not just the text). Starts collapsed each time the
+                     overlay becomes visible (reset in onResume). -->
+                <LinearLayout
+                    android:id="@+id/pnp_header"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Pick &amp; Play"
+                        android:textColor="@color/text_dim"
+                        android:textSize="20sp"
+                        android:textAllCaps="true"
+                        android:letterSpacing="0.08" />
+
+                    <TextView
+                        android:id="@+id/pnp_arrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:includeFontPadding="false"
+                        android:text="▶"
+                        android:textColor="@color/text_dim"
+                        android:textSize="20sp" />
+                </LinearLayout>
+
+                <!-- Collapsible body (hidden by default; toggled by pnp_header). -->
+                <LinearLayout
+                    android:id="@+id/pnp_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="14dp"
+                    android:paddingBottom="14dp"
+                    android:visibility="gone">
+
+                <!-- Search favourites (same as the dashboard card) with a trailing ✕ clear button.
+                     The typed query goes to HA on each debounced keystroke; results come back in
+                     pnp_results; picking a row loads its album+track. -->
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp">
+
+                    <EditText
+                        android:id="@+id/search_box"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="52dp"
+                        android:background="@drawable/control_bg"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="48dp"
+                        android:hint="Search favourites…"
+                        android:textColor="@color/text_light"
+                        android:textColorHint="@color/text_dim"
+                        android:textSize="16sp"
+                        android:inputType="text"
+                        android:singleLine="true"
+                        android:imeOptions="actionSearch" />
+
+                    <TextView
+                        android:id="@+id/search_clear"
+                        android:layout_width="44dp"
+                        android:layout_height="match_parent"
+                        android:layout_gravity="end|center_vertical"
+                        android:gravity="center"
+                        android:text="✕"
+                        android:textColor="@color/text_dim"
+                        android:textSize="18sp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:visibility="gone"
+                        android:contentDescription="Clear search" />
+                </FrameLayout>
+
+                <Spinner
+                    android:id="@+id/results_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:minHeight="52dp"
+                    android:background="@drawable/control_bg"
+                    android:paddingHorizontal="12dp" />
+
+                <Spinner
+                    android:id="@+id/album_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:minHeight="52dp"
+                    android:background="@drawable/control_bg"
+                    android:paddingHorizontal="12dp" />
+
+                <Spinner
+                    android:id="@+id/track_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:minHeight="52dp"
+                    android:background="@drawable/control_bg"
+                    android:paddingHorizontal="12dp" />
+
+                <Button
+                    android:id="@+id/btn_play_sel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Play"
+                    android:textColor="@color/white"
+                    android:textAllCaps="false"
+                    android:textSize="16sp"
+                    android:backgroundTint="@color/ha_blue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/m_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:gravity="center"
+                android:maxLines="3"
+                android:ellipsize="end"
+                android:textColor="@color/text_light"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:text="Nothing playing" />
+
+            <TextView
+                android:id="@+id/m_sub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@color/text_dim"
+                android:textSize="17sp"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/m_speaker"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="@color/ha_blue"
+                android:textSize="15sp"
+                android:text="" />
+
+            <!-- track transport -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/btn_prev"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:background="@drawable/circle_dim"
+                    android:scaleType="fitCenter"
+                    android:padding="18dp"
+                    android:src="@drawable/ic_skip_prev"
+                    android:contentDescription="Previous track" />
+
+                <ImageButton
+                    android:id="@+id/btn_playpause"
+                    android:layout_width="108dp"
+                    android:layout_height="108dp"
+                    android:layout_marginHorizontal="16dp"
+                    android:background="@drawable/circle_accent"
+                    android:scaleType="fitCenter"
+                    android:padding="26dp"
+                    android:src="@drawable/ic_play"
+                    android:contentDescription="Play/Pause" />
+
+                <ImageButton
+                    android:id="@+id/btn_next"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:background="@drawable/circle_dim"
+                    android:scaleType="fitCenter"
+                    android:padding="18dp"
+                    android:src="@drawable/ic_skip_next"
+                    android:contentDescription="Next track" />
+            </LinearLayout>
+
+            <!-- playlist (album) prev/next — moved down here from the old art overlay and
+                 restyled to look exactly like the track transport buttons above. -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/btn_prev_album"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:background="@drawable/circle_dim"
+                    android:scaleType="fitCenter"
+                    android:padding="18dp"
+                    android:src="@drawable/ic_album_prev"
+                    android:contentDescription="Previous playlist" />
+
+                <ImageButton
+                    android:id="@+id/btn_next_album"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:layout_marginStart="40dp"
+                    android:background="@drawable/circle_dim"
+                    android:scaleType="fitCenter"
+                    android:padding="18dp"
+                    android:src="@drawable/ic_album_next"
+                    android:contentDescription="Next playlist" />
+            </LinearLayout>
+
+            <!-- volume -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/btn_voldown"
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
+                    android:gravity="center"
+                    android:text="−"
+                    android:textColor="@color/text_light"
+                    android:textSize="32sp"
+                    android:background="@drawable/circle_dim" />
+
+                <TextView
+                    android:id="@+id/m_vol"
+                    android:layout_width="96dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="14dp"
+                    android:gravity="center"
+                    android:textColor="@color/text_light"
+                    android:textSize="22sp"
+                    android:text="" />
+
+                <TextView
+                    android:id="@+id/btn_volup"
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
+                    android:gravity="center"
+                    android:text="+"
+                    android:textColor="@color/text_light"
+                    android:textSize="32sp"
+                    android:background="@drawable/circle_dim" />
+            </LinearLayout>
+
+            <!-- room picker (chips built at runtime). marginHorizontal -16dp cancels the parent's
+                 16dp padding so the row is full-bleed; renderChips leaves only 3dp at each end, and
+                 the reclaimed width goes into the weight-1 chips. Keep in sync with parent padding. -->
+            <LinearLayout
+                android:id="@+id/chips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="30dp"
+                android:layout_marginHorizontal="-16dp"
+                android:clipChildren="false"
+                android:orientation="horizontal" />
+
+            <!-- Seek bar for the currently playing track: elapsed | bar | remaining. Position/duration
+                 come from HA (already extrapolated); the app ticks it forward 1s locally between refreshes
+                 and publishes a seek command on drag-release. Hidden when nothing is playing (duration 0). -->
+            <!-- Full-bleed (marginHorizontal -16dp cancels the parent's 16dp padding). The bar gets its
+                 own edge-to-edge line (SeekBar's internal side padding removed); the times sit on the
+                 line below, hard against the two screen edges. -->
+            <LinearLayout
+                android:id="@+id/seek_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="26dp"
+                android:layout_marginHorizontal="-16dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <SeekBar
+                    android:id="@+id/seek_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:progressTint="@color/ha_blue"
+                    android:thumbTint="@color/ha_blue" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/seek_cur"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="6dp"
+                        android:gravity="start"
+                        android:text="0:00"
+                        android:textColor="@color/text_dim"
+                        android:textSize="13sp" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/seek_rem"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingEnd="6dp"
+                        android:gravity="end"
+                        android:text="-0:00"
+                        android:textColor="@color/text_dim"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <TextView
+        android:id="@+id/close"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="14dp"
+        android:gravity="center"
+        android:text="✕"
+        android:textColor="@color/text_light"
+        android:textSize="22sp"
+        android:background="@drawable/circle_dim"
+        android:contentDescription="@string/close" />
+
+</FrameLayout>

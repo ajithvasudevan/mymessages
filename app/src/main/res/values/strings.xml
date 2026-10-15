@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MyMessages</string>
+    <string name="btn_notifications">Notifications (view last)</string>
+    <string name="grant_perms">Grant permissions</string>
+    <string name="restart_service">Restart listener service</string>
+    <string name="close">Close</string>
+
+    <!-- Messaging -->
+    <string name="btn_conversations">Conversations</string>
+    <string name="conversations_shortcut_label">SMS Conversations</string>
+    <string name="btn_inbox">Received SMS (inbox)</string>
+    <string name="btn_compose">New message</string>
+    <string name="btn_blocked">Blocked senders</string>
+    <string name="btn_blocked_messages">Blocked messages</string>
+    <string name="btn_regex">Text filters (regex)</string>
+    <string name="btn_default_sms">Set as default SMS app</string>
+    <string name="msg_send">Send</string>
+    <string name="msg_to">To (phone number)</string>
+    <string name="msg_type">Type a message</string>
+
+    <!-- Notification pop-up screen (settings section on the main UI) -->
+    <string name="notif_header">Notification pop-up</string>
+    <string name="notif_enable">Pop up new notifications on the lock screen</string>
+    <string name="notif_access">Grant notification access</string>
+    <string name="notif_font">Font size</string>
+    <string name="notif_volume">Sound volume</string>
+    <string name="notif_autoclose">Auto-dismiss</string>
+    <string name="notif_pick_sound">Pick sound</string>
+    <string name="notif_bg">Background colour</string>
+    <string name="notif_fg">Text colour</string>
+    <string name="notif_test">Test pop-up</string>
+    <string name="notif_default_sound">Default notification tone</string>
+    <string name="notif_filter">Filter app+cat</string>
+    <string name="notif_filter_sender">Filter sender</string>
+    <string name="notif_filter_text">Filter text</string>
+    <string name="notif_filter_manage">Manage filter</string>
+    <string name="notif_filters_manage">Notification filters (substring/regex)</string>
+    <string name="notif_shortcut_label">Notifications</string>
+    <string name="svc_enable">Run background service (persistent notification)</string>
+    <string name="svc_enable_hint">Needed for lock-screen pop-ups and instant Telegram. Off = no persistent notification; receiving SMS still works.</string>
+    <string name="notif_filter_header">Filtered</string>
+    <string name="notif_filter_none">Nothing filtered</string>
+    <string name="notif_filter_clear">Clear all</string>
+    <string name="notif_image_desc">Attached image</string>
+    <!-- Ported from LockDash (dashboard screens / shortcuts) -->
+    <string name="whatson_shortcut_label">What\'s On</string>
+    <string name="btn_whatson">What\'s on?</string>
+    <string name="btn_ha">Home Assistant</string>
+    <string name="btn_music">Music</string>
+    <string name="sc_whatson">What\'s On</string>
+    <string name="sc_camera">Door Cam</string>
+    <string name="sc_ha">Home</string>
+    <string name="screens_header">Screens</string>
+    <string name="camera_shortcut_label">Door Camera</string>
+    <string name="doorbell_label">Front door</string>
+    <string name="mute">Mute / unmute audio</string>
+    <string name="speak">Talk to door</string>
+</resources>

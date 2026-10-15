@@ -1,0 +1,66 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Broker defaults from a gitignored app/secrets.properties (mirrors LockDash). base_topic stays
+// "lockdash" so MyMessages receives the SAME telegram-userbot pushes with no HA-side change.
+def secrets = new Properties()
+def secretsFile = rootProject.file("app/secrets.properties")
+if (secretsFile.exists()) { secretsFile.withInputStream { secrets.load(it) } }
+def sv = { String k, String d -> (secrets.getProperty(k) ?: d) }
+
+android {
+    namespace 'dev.ajithv.mymessages'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "dev.ajithv.mymessages"
+        minSdk 27            // API 27: setShowWhenLocked / setTurnScreenOn available
+        targetSdk 34
+        versionCode 53
+        versionName "r54-blocked-search"
+
+        // libVLC (CameraActivity RTSP) ships native .so per-ABI; the phone is arm64.
+        ndk { abiFilters 'arm64-v8a' }
+
+        buildConfigField "String", "DEF_BROKER_HOST", "\"${sv('broker_host', '172.20.1.100')}\""
+        buildConfigField "int",    "DEF_BROKER_PORT", "${sv('broker_port', '1883')}"
+        buildConfigField "String", "DEF_BROKER_USER", "\"${sv('broker_user', '')}\""
+        buildConfigField "String", "DEF_BROKER_PASS", "\"${sv('broker_pass', '')}\""
+        buildConfigField "String", "DEF_BASE_TOPIC",  "\"${sv('base_topic', 'lockdash')}\""
+        // Ported from LockDash: camera RTSP, HA WebView URL, over-lock-screen auto-dismiss.
+        buildConfigField "String", "DEF_RTSP_URL",  "\"${sv('rtsp_url', '')}\""
+        buildConfigField "String", "DEF_HA_URL",    "\"${sv('ha_url', 'http://172.20.1.100:8123')}\""
+        buildConfigField "int",    "DEF_DISMISS_MS","${sv('dismiss_ms', '90000')}"
+    }
+
+    buildFeatures { buildConfig true }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+    lint { abortOnError false }
+    packaging {
+        resources.excludes += ['META-INF/*.kotlin_module']
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.24"
+    implementation "androidx.core:core-ktx:1.13.1"
+    implementation "androidx.appcompat:appcompat:1.7.0"
+    implementation "com.google.android.material:material:1.12.0"
+    implementation "androidx.recyclerview:recyclerview:1.3.2"
+    implementation "org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5"
+    // LockDash camera screen (RTSP over the lock screen).
+    implementation "org.videolan.android:libvlc-all:3.6.0"
+}

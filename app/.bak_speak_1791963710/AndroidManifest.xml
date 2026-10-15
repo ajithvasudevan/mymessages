@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ===== Notification-overlay perms (ported verbatim from LockDash) ===== -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Briefly max STREAM_ALARM so the notif tone plays at its own volume, independent of system -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
+
+    <!-- ===== SMS / MMS (default-messaging-app) perms ===== -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_MMS" />
+    <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- Package visibility (Android 11+): needed so the notification overlay can resolve another
+         app's launch intent when you tap its name. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher_sms"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_sms"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.Dash.Main">
+
+        <!-- Home / setup screen: messaging entry points + the notification-overlay settings. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ================= Messaging screens ================= -->
+        <!-- singleTask + own affinity so the "SMS Conversations" launcher ALWAYS lands on the
+             conversation list (any open thread on top is cleared), not wherever the task was left. -->
+        <activity
+            android:name=".ConversationListActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ajithv.mymessages.task.sms"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Second home-screen launcher icon that opens straight to SMS Conversations. -->
+        <activity-alias
+            android:name=".ConversationsShortcut"
+            android:targetActivity=".ConversationListActivity"
+            android:exported="true"
+            android:label="@string/conversations_shortcut_label"
+            android:icon="@mipmap/ic_launcher_sms"
+            android:roundIcon="@mipmap/ic_launcher_sms">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity
+            android:name=".BlockedListActivity"
+            android:exported="false" />
+        <activity
+            android:name=".BlockedMessagesActivity"
+            android:exported="false" />
+        <activity
+            android:name=".RegexListActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".RegexMatchesActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ThreadActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- The default-SMS-app COMPOSE activity: handles SENDTO/SEND from other apps.
+             (One of the four components Android requires of a default messaging app.) -->
+        <activity
+            android:name=".ComposeActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SENDTO" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sms" />
+                <data android:scheme="smsto" />
+                <data android:scheme="mms" />
+                <data android:scheme="mmsto" />
+            </intent-filter>
+        </activity>
+
+        <!-- ================= Notification overlay (kept from LockDash) ================= -->
+        <activity
+            android:name=".FilterActivity"
+            android:exported="false"
+            android:label="@string/notif_filter_header" />
+
+        <!-- Notification-overlay substring/regex filters (see NotifFilterRepo). -->
+        <activity
+            android:name=".NotifFilterListActivity"
+            android:exported="false"
+            android:label="@string/notif_filters_manage" />
+
+        <activity
+            android:name=".NotifActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ajithv.mymessages.task.notif"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:showOnLockScreen="true"
+            android:theme="@style/Theme.Dash.Camera" />
+
+        <!-- Home-screen launcher that opens the notification overlay directly (on the last
+             notification, silent — a bare launch carries no payload, so NotifActivity pages history). -->
+        <activity-alias
+            android:name=".NotifOverlayShortcut"
+            android:targetActivity=".NotifActivity"
+            android:exported="true"
+            android:label="@string/notif_shortcut_label"
+            android:icon="@mipmap/ic_launcher_notif"
+            android:roundIcon="@mipmap/ic_launcher_notif">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity
+            android:name=".LinkWebActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ajithv.mymessages.task.link"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:showOnLockScreen="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.Dash.Camera" />
+
+        <activity
+            android:name=".ImageViewActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ajithv.mymessages.task.imageview"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:showOnLockScreen="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.Dash.Camera" />
+
+        <!-- Reads the phone's notifications and pops NotifActivity when the master switch is on. -->
+        <service
+            android:name=".NotifListener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Persistent FGS: wakes the phone + opens the overlay over the lock screen. -->
+        <service
+            android:name=".DashService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Wakes the phone and shows incoming messages/notifications over the lock screen" />
+        </service>
+
+        <!-- ================= Default-SMS-app components ================= -->
+        <!-- (1) Incoming SMS. Only the default SMS app receives SMS_DELIVER + may write the provider. -->
+        <receiver
+            android:name=".SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_DELIVER" />
+            </intent-filter>
+        </receiver>
+
+        <!-- (2) Incoming MMS (WAP push). -->
+        <receiver
+            android:name=".MmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_WAP_PUSH">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
+                <data android:mimeType="application/vnd.wap.mms-message" />
+            </intent-filter>
+        </receiver>
+
+        <!-- (3b) Send-status result for SMS we dispatched (fired by the platform via our sentIntent). -->
+        <receiver
+            android:name=".SmsSentReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="dev.ajithv.mymessages.SMS_SENT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- (4) Quick-reply-to-a-call service (RESPOND_VIA_MESSAGE). Required to qualify as default. -->
+        <service
+            android:name=".HeadlessSmsSendService"
+            android:exported="true"
+            android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.RESPOND_VIA_MESSAGE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="sms" />
+                <data android:scheme="smsto" />
+                <data android:scheme="mms" />
+                <data android:scheme="mmsto" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ===== Dashboard screens (ported from LockDash): over-lock-screen, MQTT-driven ===== -->
+        <activity
+            android:name=".WhatsOnActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ajithv.mymessages.task.whatson"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:showOnLockScreen="true"
+            android:theme="@style/Theme.Dash.Overlay" />
+
+        <!-- Second launcher icon that jumps straight to the What's On table
+             (mirrors BellCam's Door Camera shortcut). Also selectable as a
+             hardware-button / gesture shortcut target. -->
+        <activity-alias
+            android:name=".WhatsOnShortcut"
+            android:targetActivity=".WhatsOnActivity"
+            android:exported="true"
+            android:label="@string/whatson_shortcut_label"
+            android:icon="@mipmap/ic_launcher_whatson"
+            android:roundIcon="@mipmap/ic_launcher_whatson">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Generic dash screen #2: the camera feed (folded in from BellCam). -->
+        <activity
+            android:name=".CameraActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ajithv.mymessages.task.camera"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:showOnLockScreen="true"
+            android:theme="@style/Theme.Dash.Camera" />
+
+        <!-- Direct launcher / shortcut to the door camera (mirrors BellCam's). -->
+        <activity-alias
+            android:name=".DoorCameraShortcut"
+            android:targetActivity=".CameraActivity"
+            android:exported="true"
+            android:label="@string/camera_shortcut_label"
+            android:icon="@mipmap/ic_launcher_cam"
+            android:roundIcon="@mipmap/ic_launcher_cam">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Generic dash screen #3: frame-less full-screen Home Assistant WebView. -->
+        <activity
+            android:name=".HaWebActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ajithv.mymessages.task.ha"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:showOnLockScreen="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.Dash.Camera" />
+
+        <!-- Exported entry point for HaWebActivity so the app-shortcut (long-press menu) can launch it.
+             No LAUNCHER category = no extra home-screen icon, just an explicit-launch target. -->
+        <activity-alias
+            android:name=".HaShortcut"
+            android:targetActivity=".HaWebActivity"
+            android:exported="true"
+            android:label="@string/btn_ha" />
+
+        <!-- Generic dash screen #4: Now Playing (music). -->
+        <activity
+            android:name=".MusicActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ajithv.mymessages.task.music"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:showOnLockScreen="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.Dash.Camera" />
+
+        <!-- Launcher shortcut straight to the Music screen (mirrors What's On / Door Camera). -->
+        <activity-alias
+            android:name=".MusicShortcut"
+            android:targetActivity=".MusicActivity"
+            android:exported="true"
+            android:label="@string/btn_music"
+            android:icon="@mipmap/ic_launcher_music"
+            android:roundIcon="@mipmap/ic_launcher_music">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+    </application>
+</manifest>

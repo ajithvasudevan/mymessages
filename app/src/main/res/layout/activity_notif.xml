@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Full-screen "new notification" screen. Background + text colours and font sizes are all
+     applied at runtime from Prefs (NotifActivity.render), so nothing here hard-codes them. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/notif_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clickable="true"
+    android:focusable="true"
+    android:background="#0D1117">
+
+    <LinearLayout
+        android:id="@+id/notif_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingTop="14dp"
+        android:paddingBottom="28dp">
+
+        <!-- Sending app (icon + name + category) — sits in the top band, left of the ✕ close chip.
+             marginEnd keeps it clear of the close chip at top-right. -->
+        <TextView
+            android:id="@+id/notif_app"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
+            android:layout_marginEnd="56dp"
+            android:gravity="center_vertical"
+            android:letterSpacing="0.08"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            tools:ignore="HardcodedText" />
+
+        <!-- Received date + time (small, dim), below the app name -->
+        <TextView
+            android:id="@+id/notif_time"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
+            android:layout_marginEnd="56dp"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+
+        <!-- Sender / title (bold, large) -->
+        <TextView
+            android:id="@+id/notif_sender"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:textSize="34sp" />
+
+        <!-- Body: optional attached image (BigPictureStyle — Telegram / HA Companion photos) above the
+             text; both scroll together if they overflow. -->
+        <ScrollView
+            android:id="@+id/notif_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="18dp"
+            android:fillViewport="true"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Image(s) attached to the notification — one ImageView per image, stacked, added at
+                     runtime (a Telegram album shows all its photos one below the other). -->
+                <LinearLayout
+                    android:id="@+id/notif_images"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/notif_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="28dp"
+                    android:paddingEnd="28dp"
+                    android:gravity="top"
+                    android:lineSpacingMultiplier="1.1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="44sp" />
+
+                <!-- Rich body: built at runtime when the message contains detected tables / code blocks
+                     (mixed proportional text + aligned-monospace blocks). Hidden when notif_text is used. -->
+                <LinearLayout
+                    android:id="@+id/notif_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="28dp"
+                    android:paddingEnd="28dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- Close chip — the ONLY way to dismiss by touch (tapping elsewhere does nothing) -->
+    <TextView
+        android:id="@+id/notif_close"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:padding="18dp"
+        android:text="✕"
+        android:textColor="#FFFFFF"
+        android:textSize="26sp"
+        android:clickable="true"
+        android:focusable="true"
+        tools:ignore="HardcodedText" />
+
+</FrameLayout>

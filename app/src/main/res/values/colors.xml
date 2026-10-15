@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HA dashboard toggle accent -->
+    <color name="ha_blue">#03A9F4</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Lock-screen dash palette -->
+    <color name="scrim">#66000000</color>              <!-- light dim over the wallpaper -->
+    <color name="table_bg">#E61E1E22</color>           <!-- dark-grey table container -->
+    <color name="row_bg">#FF33333A</color>             <!-- dark-grey row card -->
+    <color name="text_light">#FFD0D0D0</color>         <!-- light-grey primary text -->
+    <color name="text_dim">#FF9AA0A6</color>           <!-- dimmer grey (power) -->
+
+    <!-- switch off states -->
+    <color name="sw_track_off">#55FFFFFF</color>
+    <color name="sw_thumb_off">#FFECECEC</color>
+
+    <!-- launcher icon backgrounds -->
+    <color name="ic_launcher_background">#1B2A4A</color>
+    <color name="ic_launcher_whatson_background">#204A3A</color>
+    <color name="ic_launcher_cam_background">#1B5E3A</color>
+    <color name="ic_launcher_music_background">#3A1B5E</color>
+    <color name="ic_launcher_notif_background">#5E1B2A</color>
+</resources>

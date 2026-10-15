@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:tabMode="fixed"
+        app:tabGravity="fill" />
+
+    <!-- ============================== SMS tab ============================== -->
+    <ScrollView
+        android:id="@+id/tab_sms"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textSize="15sp"
+                android:paddingBottom="8dp"
+                android:text="MyMessages" />
+
+            <TextView
+                android:id="@+id/blocked_stats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textSize="13sp"
+                android:paddingBottom="24dp"
+                android:text="Blocked SMS: …" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Messages"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                android:textSize="13sp"
+                android:paddingBottom="8dp" />
+
+            <Button
+                android:id="@+id/btn_conversations"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_conversations" />
+
+            <Button
+                android:id="@+id/btn_compose"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/btn_compose" />
+
+            <Button
+                android:id="@+id/btn_blocked"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/btn_blocked" />
+
+            <Button
+                android:id="@+id/btn_blocked_messages"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/btn_blocked_messages" />
+
+            <Button
+                android:id="@+id/btn_regex"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/btn_regex" />
+
+            <Button
+                android:id="@+id/btn_default_sms"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/btn_default_sms" />
+
+            <!-- Message-list / thread font size (also pinch-to-zoom on those screens). -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="16dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Message font size" />
+                <TextView
+                    android:id="@+id/tv_sms_font"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="56dp"
+                    android:gravity="end"
+                    android:textStyle="bold"
+                    android:text="14 sp" />
+            </LinearLayout>
+            <SeekBar
+                android:id="@+id/sk_sms_font"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="16dp"
+                android:background="#33000000" />
+
+            <Button
+                android:id="@+id/btn_perms"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/grant_perms" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- ========================= Notifications tab ========================= -->
+    <ScrollView
+        android:id="@+id/tab_notif"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <TextView
+                android:id="@+id/status_notif"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textSize="15sp"
+                android:paddingBottom="24dp"
+                android:text="MQTT: …" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/notif_header"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                android:textSize="13sp"
+                android:paddingBottom="8dp" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/sw_notif"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/notif_enable" />
+
+            <Button
+                android:id="@+id/btn_notif_access"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/notif_access" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/sw_service"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/svc_enable" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:paddingBottom="4dp"
+                android:alpha="0.7"
+                android:text="@string/svc_enable_hint" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="12dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/notif_font" />
+                <TextView
+                    android:id="@+id/tv_font"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="56dp"
+                    android:gravity="end"
+                    android:textStyle="bold"
+                    android:text="44 sp" />
+            </LinearLayout>
+            <SeekBar
+                android:id="@+id/sk_font"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/notif_volume" />
+                <TextView
+                    android:id="@+id/tv_vol"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="56dp"
+                    android:gravity="end"
+                    android:textStyle="bold"
+                    android:text="80%" />
+            </LinearLayout>
+            <SeekBar
+                android:id="@+id/sk_vol"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/notif_autoclose" />
+                <TextView
+                    android:id="@+id/tv_autoclose"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="56dp"
+                    android:gravity="end"
+                    android:textStyle="bold"
+                    android:text="30s" />
+            </LinearLayout>
+            <SeekBar
+                android:id="@+id/sk_autoclose"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="120" />
+
+            <Button
+                android:id="@+id/btn_sound"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/notif_pick_sound" />
+            <TextView
+                android:id="@+id/tv_sound"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="2dp"
+                android:paddingBottom="4dp"
+                android:textSize="13sp"
+                android:text="@string/notif_default_sound" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="12dp">
+                <Button
+                    android:id="@+id/btn_bg"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:text="@string/notif_bg" />
+                <View
+                    android:id="@+id/sw_bg"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="10dp"
+                    android:background="#0D1117" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+                <Button
+                    android:id="@+id/btn_fg"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:text="@string/notif_fg" />
+                <View
+                    android:id="@+id/sw_fg"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="10dp"
+                    android:background="#FFFFFF" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btn_test"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/notif_test" />
+
+            <Button
+                android:id="@+id/btn_filter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/notif_filter_manage" />
+
+            <Button
+                android:id="@+id/btn_notif_filters"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/notif_filters_manage" />
+
+            <Button
+                android:id="@+id/btn_notif_screen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/btn_notifications" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="12dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="History limit" />
+                <TextView
+                    android:id="@+id/tv_hist_max"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="56dp"
+                    android:gravity="end"
+                    android:textStyle="bold"
+                    android:text="500" />
+            </LinearLayout>
+            <SeekBar
+                android:id="@+id/sk_hist_max"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <Button
+                android:id="@+id/btn_clear_history"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="Clear history" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="16dp"
+                android:background="#33000000" />
+
+            <Button
+                android:id="@+id/btn_restart"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/restart_service" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- ========================= Dashboard tab (LockDash screens) ========================= -->
+    <ScrollView
+        android:id="@+id/tab_dash"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/screens_header"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                android:textSize="13sp"
+                android:paddingBottom="8dp" />
+
+            <Button
+                android:id="@+id/btn_whatson"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_whatson" />
+
+            <Button
+                android:id="@+id/btn_camera"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/camera_shortcut_label" />
+
+            <Button
+                android:id="@+id/btn_music"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/btn_music" />
+
+            <Button
+                android:id="@+id/btn_ha"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="@string/btn_ha" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <ScrollView
+        android:id="@+id/tab_trip"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="TRIP TRACKER"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                android:textSize="13sp"
+                android:paddingBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tv_trip_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="No active trip"
+                android:paddingBottom="14dp" />
+
+            <EditText
+                android:id="@+id/et_trip_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Trip name (optional)"
+                android:inputType="text"
+                android:maxLines="1" />
+
+            <TextView
+                android:id="@+id/tv_trip_interval"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:text="Send interval: 15 s" />
+
+            <SeekBar
+                android:id="@+id/sk_trip_interval"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="118" />
+
+            <Button
+                android:id="@+id/btn_trip_start"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="▶ Start Trip" />
+
+            <Button
+                android:id="@+id/btn_trip_stop"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:text="■ Stop Trip" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="16dp"
+                android:textSize="12sp"
+                android:text="A trip can also be started from the Trip Tracker panel in Home Assistant; this phone starts sending GPS automatically whenever a trip is active." />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
