@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.Granularity
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -37,6 +38,11 @@ class TripTracker(
         override fun onLocationResult(result: LocationResult) {
             val loc = result.lastLocation ?: return
             if (tripId <= 0) return
+            // Drop low-confidence (network/coarse) fixes so the track stays precise.
+            if (loc.hasAccuracy() && loc.accuracy > MAX_ACCURACY_M) {
+                Log.i(TAG, "fix dropped: accuracy ${loc.accuracy}m > ${MAX_ACCURACY_M}m")
+                return
+            }
             val o = JSONObject()
                 .put("trip_id", tripId)
                 .put("ts", loc.time)            // epoch ms
@@ -72,7 +78,8 @@ class TripTracker(
         val ms = interval * 1000L
         val req = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, ms)
             .setMinUpdateIntervalMillis(ms)
-            .setWaitForAccurateLocation(false)
+            .setGranularity(Granularity.GRANULARITY_FINE)   // force precise (GPS), never coarse
+            .setWaitForAccurateLocation(true)               // wait for an accurate fix, not an early network one
             .build()
         try {
             fused.removeLocationUpdates(callback)
@@ -99,5 +106,8 @@ class TripTracker(
         ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         ctx.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    companion object { private const val TAG = "TripTracker" }
+    companion object {
+        private const val TAG = "TripTracker"
+        private const val MAX_ACCURACY_M = 50f   // ignore fixes less accurate than this (metres)
+    }
 }
