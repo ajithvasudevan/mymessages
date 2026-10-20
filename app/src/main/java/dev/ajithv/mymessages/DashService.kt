@@ -17,6 +17,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -34,7 +35,7 @@ import org.eclipse.paho.client.mqttv3.MqttAsyncClient
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
+import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence
 import org.json.JSONObject
 
 /**
@@ -94,9 +95,13 @@ class DashService : Service() {
         // retained trips/state (see TripTracker). EXTRA_PAYLOAD = trip name, EXTRA_SCREEN = interval (s).
         const val ACTION_TRIP_START = "dev.ajithv.mymessages.TRIP_START"
         const val ACTION_TRIP_STOP  = "dev.ajithv.mymessages.TRIP_STOP"
+        const val EXTRA_TRIP_MODE = "dev.ajithv.mymessages.TRIP_MODE"   // "time" | "distance"
+        const val EXTRA_TRIP_DIST = "dev.ajithv.mymessages.TRIP_DIST"   // min metres (distance mode)
         const val RING_CHANNEL = "mymsg_ring"                             // HIGH importance (heads-up + Stop)
         const val RING_ID = 2                                            // distinct from ONGOING_ID (1)
         const val RING_DEFAULT_SECS = 120                                // auto-stop safety if no /ring stop
+        private const val WATCHDOG_MS = 60_000L          // reconnect-watchdog check cadence
+        private const val STALE_MS = 150_000L            // rebuild the client after this long continuously down
 
         @Volatile var connected = false
     }
@@ -118,12 +123,34 @@ class DashService : Service() {
     private val ringTimeout = Runnable { stopRinging() }
     @Volatile private var ringing = false
 
+    // ---- reconnect watchdog ----
+    // Paho's own auto-reconnect normally heals a drop; this catches the rarer case where that thread
+    // wedges and never recovers (the flaky-mobile-link silent stall). Monotonic clock = Doze-safe.
+    private var downSinceMs = 0L
+    private val watchdogHandler = Handler(Looper.getMainLooper())
+    private val watchdogTick = object : Runnable {
+        override fun run() {
+            try {
+                val age = if (downSinceMs == 0L) 0L else SystemClock.elapsedRealtime() - downSinceMs
+                if (shouldRunForeground() && !connected && age > STALE_MS) {
+                    Log.w(TAG, "watchdog: MQTT down ${age / 1000}s (auto-reconnect wedged?) -> rebuilding client")
+                    try { client?.disconnectForcibly(200) } catch (_: Exception) {}
+                    try { client?.close() } catch (_: Exception) {}
+                    client = null
+                    connect()   // fresh client + reconnect thread; cleanSession=false keeps the broker session,
+                                // file persistence replays any un-acked QoS-1 messages across the rebuild
+                }
+            } catch (e: Exception) { Log.w(TAG, "watchdog error: ${e.message}") }
+            watchdogHandler.postDelayed(this, WATCHDOG_MS)
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         TalkConfig.load(this)   // doorbell-talk audio settings (gain/hpf/ns), updated live over MQTT
-        trip = TripTracker(this, tripBase) { t, p -> publish(t, p) }
+        trip = TripTracker(this, tripBase, { connected }) { t, p -> publish(t, p) }
         createChannels()
         // A foreground service MUST post its notification promptly (mandatory when started via
         // startForegroundService), so always startForeground first, then drop it if we're not meant to
@@ -132,6 +159,7 @@ class DashService : Service() {
         if (shouldRunForeground()) {
             acquireLocks()
             connect()
+            watchdogHandler.postDelayed(watchdogTick, WATCHDOG_MS)
             trip?.resumeIfActive()   // resume GPS streaming if a trip was active before the restart
         } else {
             hideOngoing()   // no persistent notification; created only to service a one-off pop
@@ -186,7 +214,10 @@ class DashService : Service() {
             ACTION_TRIP_START -> {
                 val name = intent.getStringExtra(EXTRA_PAYLOAD) ?: ""
                 val iv = intent.getStringExtra(EXTRA_SCREEN)?.toIntOrNull() ?: Prefs.tripInterval(this)
-                val o = JSONObject().put("cmd", "start").put("source", "app").put("interval_s", iv)
+                val mode = intent.getStringExtra(EXTRA_TRIP_MODE) ?: Prefs.tripMode(this)
+                val dist = intent.getStringExtra(EXTRA_TRIP_DIST)?.toIntOrNull() ?: Prefs.tripDistance(this)
+                val o = JSONObject().put("cmd", "start").put("source", "app").put("interval_s", iv).put("mode", mode)
+                if (mode == "distance" || mode == "hybrid") o.put("min_distance_m", dist)
                 if (name.isNotEmpty()) o.put("name", name)
                 publish("$tripBase/control", o.toString())   // add-on creates the trip + publishes trips/state
             }
@@ -203,6 +234,7 @@ class DashService : Service() {
      *  locks, remove the notification, stop the service. */
     private fun stopEverything() {
         stopRinging()
+        watchdogHandler.removeCallbacks(watchdogTick)
         trip?.stop()
         try { client?.disconnectForcibly(300) } catch (_: Exception) {}
         try { client?.close() } catch (_: Exception) {}
@@ -220,16 +252,21 @@ class DashService : Service() {
     private fun connect() {
         val uri = "tcp://${BuildConfig.DEF_BROKER_HOST}:${BuildConfig.DEF_BROKER_PORT}"
         try {
+            if (downSinceMs == 0L) downSinceMs = SystemClock.elapsedRealtime()
             val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: "dev"
             val clientId = "mymessages-" + androidId.take(15)   // DISTINCT from LockDash's "lockdash-..."
             Log.i(TAG, "connecting as $clientId")
-            val c = MqttAsyncClient(uri, clientId, MemoryPersistence())
+            // File persistence (NOT MemoryPersistence): un-acked QoS-1 messages survive a process kill or a
+            // watchdog client-rebuild and replay on the next connect (clientId + dir are the recovery key).
+            val persist = MqttDefaultFilePersistence(File(filesDir, "mqtt-persist").absolutePath)
+            val c = MqttAsyncClient(uri, clientId, persist)
             client = c
             val opts = MqttConnectOptions().apply {
                 isAutomaticReconnect = true
                 isCleanSession = false           // broker queues pushes across the ~1.3s Doze reconnects
                 connectionTimeout = 10
                 keepAliveInterval = 30
+                maxInflight = 1000           // allow a large buffered-backlog replay without overflow
                 if (BuildConfig.DEF_BROKER_USER.isNotEmpty()) userName = BuildConfig.DEF_BROKER_USER
                 if (BuildConfig.DEF_BROKER_PASS.isNotEmpty()) password = BuildConfig.DEF_BROKER_PASS.toCharArray()
             }
@@ -237,6 +274,7 @@ class DashService : Service() {
                 override fun connectComplete(reconnect: Boolean, serverURI: String?) {
                     Log.i(TAG, "connected (reconnect=$reconnect)")
                     connected = true
+                    downSinceMs = 0L
                     updateOngoing()
                     c.subscribe("$base/#", 1)
                     c.subscribe("$tripBase/#", 1)   // Trip Tracker: state/control/track
@@ -244,9 +282,12 @@ class DashService : Service() {
                         c.publish("$base/notif_state",
                             MqttMessage(notifStatePayload().toByteArray()).apply { qos = 1; isRetained = true })
                     } catch (e: Exception) { Log.w(TAG, "notif_state publish failed: ${e.message}") }
+                    trip?.onMqttConnected()   // drain any GPS points buffered during the outage
                 }
                 override fun connectionLost(cause: Throwable?) {
-                    Log.w(TAG, "connectionLost: ${cause?.message}"); connected = false; updateOngoing()
+                    Log.w(TAG, "connectionLost: ${cause?.message}"); connected = false
+                    if (downSinceMs == 0L) downSinceMs = SystemClock.elapsedRealtime()
+                    updateOngoing()
                 }
                 override fun messageArrived(t: String?, message: MqttMessage?) {
                     val topic = t ?: ""; val payload = message?.toString() ?: ""
@@ -712,6 +753,7 @@ class DashService : Service() {
 
     override fun onDestroy() {
         stopRinging()
+        watchdogHandler.removeCallbacks(watchdogTick)
         try { client?.disconnectForcibly(500) } catch (_: Exception) {}
         try { client?.close() } catch (_: Exception) {}
         try { if (wakeLock?.isHeld == true) wakeLock?.release() } catch (_: Exception) {}

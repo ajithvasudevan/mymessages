@@ -17,6 +17,8 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -459,6 +461,8 @@ class MainActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------------ Trip Tracker tab
     private val TRIP_IV_MIN = 2   // SeekBar progress 0 == this many seconds
+    private val TRIP_DIST_MIN = 5    // distance SeekBar progress 0 == this many metres
+    private val TRIP_DIST_STEP = 5   // metres per distance SeekBar step
 
     private fun wireTripTab() {
         val sk = findViewById<SeekBar>(R.id.sk_trip_interval)
@@ -472,16 +476,54 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(s: SeekBar) {}
         })
 
+        val skD = findViewById<SeekBar>(R.id.sk_trip_distance)
+        val lblD = findViewById<TextView>(R.id.tv_trip_distance)
+        fun metres() = skD.progress * TRIP_DIST_STEP + TRIP_DIST_MIN
+        skD.progress = ((Prefs.tripDistance(this) - TRIP_DIST_MIN) / TRIP_DIST_STEP).coerceIn(0, skD.max)
+        lblD.text = "Send every: ${metres()} m"
+        skD.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar, p: Int, u: Boolean) { lblD.text = "Send every: ${p * TRIP_DIST_STEP + TRIP_DIST_MIN} m" }
+            override fun onStartTrackingTouch(s: SeekBar) {}
+            override fun onStopTrackingTouch(s: SeekBar) {}
+        })
+
+        val rg = findViewById<RadioGroup>(R.id.rg_trip_mode)
+        fun applyMode() {
+            val id = rg.checkedRadioButtonId
+            val showIv = id != R.id.rb_trip_dist    // time + hybrid show interval
+            val showD = id != R.id.rb_trip_time     // distance + hybrid show distance
+            lbl.visibility = if (showIv) View.VISIBLE else View.GONE
+            sk.visibility = if (showIv) View.VISIBLE else View.GONE
+            lblD.visibility = if (showD) View.VISIBLE else View.GONE
+            skD.visibility = if (showD) View.VISIBLE else View.GONE
+        }
+        findViewById<RadioButton>(when (Prefs.tripMode(this)) {
+            "distance" -> R.id.rb_trip_dist
+            "time" -> R.id.rb_trip_time
+            else -> R.id.rb_trip_hybrid
+        }).isChecked = true
+        applyMode()
+        rg.setOnCheckedChangeListener { _, _ -> applyMode() }
+
         findViewById<Button>(R.id.btn_trip_start).setOnClickListener {
             if (!ensureLocationPermission()) return@setOnClickListener
             if (!Prefs.fgEnabled(this)) { Prefs.setFgEnabled(this, true) }   // trips need the persistent service
             val name = findViewById<EditText>(R.id.et_trip_name).text.toString().trim()
+            val modeStr = when (rg.checkedRadioButtonId) {
+                R.id.rb_trip_dist -> "distance"
+                R.id.rb_trip_time -> "time"
+                else -> "hybrid"
+            }
             val iv = secs()
-            Prefs.setTripInterval(this, iv)
+            val md = metres()
+            Prefs.setTripInterval(this, iv); Prefs.setTripDistance(this, md)
+            Prefs.setTripMode(this, modeStr)
             startService(Intent(this, DashService::class.java)
                 .setAction(DashService.ACTION_TRIP_START)
                 .putExtra(DashService.EXTRA_PAYLOAD, name)
-                .putExtra(DashService.EXTRA_SCREEN, iv.toString()))
+                .putExtra(DashService.EXTRA_SCREEN, iv.toString())
+                .putExtra(DashService.EXTRA_TRIP_MODE, modeStr)
+                .putExtra(DashService.EXTRA_TRIP_DIST, md.toString()))
             startDashService()   // make sure it's up to receive the action + connect MQTT
             findViewById<EditText>(R.id.et_trip_name).text?.clear()
             refresh()
@@ -570,9 +612,12 @@ class MainActivity : AppCompatActivity() {
 
         // Trip-tab status
         findViewById<TextView>(R.id.tv_trip_status)?.text =
-            if (Prefs.tripActive(this))
-                "Trip ACTIVE — id ${Prefs.tripId(this)}, every ${Prefs.tripInterval(this)}s\n" +
+            if (Prefs.tripActive(this)) {
+                val spacing = if (Prefs.tripMode(this) == "distance") "every ${Prefs.tripDistance(this)} m"
+                              else "every ${Prefs.tripInterval(this)} s"
+                "Trip ACTIVE — id ${Prefs.tripId(this)}, $spacing\n" +
                 "last fix: ${Prefs.tripLastFix(this).ifEmpty { "waiting for GPS…" }}\nMQTT: $mqtt"
+            }
             else "No active trip.\nMQTT: $mqtt"
     }
 

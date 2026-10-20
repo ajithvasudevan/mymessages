@@ -510,6 +510,32 @@
                 android:inputType="text"
                 android:maxLines="1" />
 
+            <RadioGroup
+                android:id="@+id/rg_trip_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="12dp">
+                <RadioButton
+                    android:id="@+id/rb_trip_hybrid"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="Hybrid" />
+                <RadioButton
+                    android:id="@+id/rb_trip_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="Time" />
+                <RadioButton
+                    android:id="@+id/rb_trip_dist"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="Distance" />
+            </RadioGroup>
+
             <TextView
                 android:id="@+id/tv_trip_interval"
                 android:layout_width="match_parent"
@@ -522,6 +548,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:max="118" />
+
+            <TextView
+                android:id="@+id/tv_trip_distance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:visibility="gone"
+                android:text="Send every: 25 m" />
+
+            <SeekBar
+                android:id="@+id/sk_trip_distance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="99"
+                android:visibility="gone" />
 
             <Button
                 android:id="@+id/btn_trip_start"
@@ -544,6 +585,14 @@
                 android:paddingTop="16dp"
                 android:textSize="12sp"
                 android:text="A trip can also be started from the Trip Tracker panel in Home Assistant; this phone starts sending GPS automatically whenever a trip is active." />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:textSize="12sp"
+                android:alpha="0.7"
+                android:text="Photo match: immich photos are pinned on the track within 120 s of a track point and 300 m of the track; the add-on polls immich every 20 s while a trip is live." />
 
         </LinearLayout>
     </ScrollView>
