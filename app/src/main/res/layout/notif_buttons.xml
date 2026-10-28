@@ -2,7 +2,12 @@
 <!-- Custom content for the persistent service notification: six one-tap shortcuts on TWO rows —
      row 1 (What's On, Door Cam, HA) + row 2 (Music, Conversations, Notifications). Two rows fit the
      COLLAPSED notification height, so the buttons show without expanding. Shown via
-     DecoratedCustomViewStyle (the system draws the app-name header). -->
+     DecoratedCustomViewStyle (the system draws the app-name header).
+
+     Each button pins an explicit textSize + maxLines=1 + trimmed padding/minWidth. Without an explicit
+     size the buttons inherited buttonBarButtonStyle's textAppearance, which a system/OEM update bumped
+     larger — "What's On" then wrapped to two lines and pushed row 2 off the collapsed notification
+     (truncated). The fixed small size keeps every label on one line and both rows visible. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -21,6 +26,12 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textSize="12sp"
             android:text="What's On"
             android:textColor="?android:attr/colorAccent"
             android:textAllCaps="false" />
@@ -31,6 +42,12 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textSize="12sp"
             android:text="Door Cam"
             android:textColor="?android:attr/colorAccent"
             android:textAllCaps="false" />
@@ -41,6 +58,12 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textSize="12sp"
             android:text="HA"
             android:textColor="?android:attr/colorAccent"
             android:textAllCaps="false" />
@@ -57,6 +80,12 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textSize="12sp"
             android:text="Music"
             android:textColor="?android:attr/colorAccent"
             android:textAllCaps="false" />
@@ -67,6 +96,12 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textSize="12sp"
             android:text="Messages"
             android:textColor="?android:attr/colorAccent"
             android:textAllCaps="false" />
@@ -77,6 +112,12 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textSize="12sp"
             android:text="Notifs"
             android:textColor="?android:attr/colorAccent"
             android:textAllCaps="false" />
