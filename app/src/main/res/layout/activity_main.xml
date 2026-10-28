@@ -564,6 +564,13 @@
                 android:max="99"
                 android:visibility="gone" />
 
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/sw_trip_powersave"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Battery saver — motion-gated GPS (coarse fixes while stopped)" />
+
             <Button
                 android:id="@+id/btn_trip_start"
                 android:layout_width="match_parent"

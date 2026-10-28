@@ -3,6 +3,7 @@ package dev.ajithv.mymessages
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.util.Log
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Granularity
@@ -55,10 +56,13 @@ class TripTracker(
     @Volatile private var running = false
     // Stop/resume detection + previous RAW fix (for a delta-speed fallback when a fix lacks GPS speed).
     private var moving = false
+    private var powerSave = false   // battery saver (motion-gated GPS); read from Prefs at start()
+    private var reqMoving = true    // which LocationRequest is currently active (high-accuracy vs low-power)
     private var prevFixLat = 0.0
     private var prevFixLon = 0.0
     private var prevFixMs = 0L
     private var lastSentMs = 0L   // epoch ms of the last RECORDED point (hybrid time criterion)
+    private val recentSp = ArrayDeque<Pair<Long, Double>>()   // (epoch ms, speed m/s) of recent recorded fixes
 
     // ---- durable offline buffer (all buffer state touched only on `io`, a single thread) ----
     private val io = Executors.newSingleThreadExecutor()
@@ -92,6 +96,9 @@ class TripTracker(
                 else if (!moving && sp > START_MS) moving = true
             }
             val transition = moving != wasMoving
+            // Battery saver: while stopped, drop to a low-power/coarse request; switch back to 1 Hz
+            // high-accuracy the moment motion resumes. Only in distance/hybrid (time mode is already paced).
+            if (powerSave && mode != "time" && reqMoving != moving) applyRequest(moving)
 
             // Spacing gate. time: every (interval-sampled) fix. distance: when moved >= minDist.
             // hybrid: when moved >= minDist OR interval elapsed — so it is distance-spaced at speed
@@ -102,6 +109,24 @@ class TripTracker(
                     val far = minDistM > 0 && haversine(pla, plo, loc.latitude, loc.longitude) >= minDistM
                     val timeUp = mode == "hybrid" && lastSentMs != 0L && (loc.time - lastSentMs) >= intervalS * 1000L
                     if (!far && !timeUp) return
+                }
+            }
+            // Adaptive GPS-outlier gate: drop a fix that lands farther than max(BASE, recentSpeed*dt*K) from
+            // the last recorded point. Scales with recent speed (train/plane friendly); BASE catches teleports
+            // from near-rest. Skipped when dt is large (a real data gap) or there's no reference point yet.
+            run {
+                val rl = lastLat; val ro = lastLon
+                if (rl != null && ro != null && lastSentMs != 0L) {
+                    val dtO = (loc.time - lastSentMs) / 1000.0
+                    if (dtO > 0 && dtO <= OUTLIER_GAP_S) {
+                        val distO = haversine(rl, ro, loc.latitude, loc.longitude)
+                        val recentMs = if (recentSp.isEmpty()) 0.0 else recentSp.sumOf { it.second } / recentSp.size
+                        val allow = maxOf(OUTLIER_BASE_M, recentMs * dtO * OUTLIER_K)
+                        if (distO > allow) {
+                            Log.i(TAG, "fix dropped: ${distO.toInt()}m jump > ${allow.toInt()}m (recent ${(recentMs * 3.6).toInt()} km/h, dt ${dtO}s) — GPS outlier")
+                            return
+                        }
+                    }
                 }
             }
             val o = JSONObject()
@@ -115,7 +140,24 @@ class TripTracker(
             if (loc.hasAltitude()) o.put("alt", loc.altitude)
             // Record first (distance-gate reference + buffer), independent of connectivity.
             lastLat = loc.latitude; lastLon = loc.longitude; lastSentMs = loc.time
+            if (!sp.isNaN()) {   // feed the recent-average-speed window (recorded fixes only)
+                recentSp.addLast(loc.time to sp)
+                while (recentSp.isNotEmpty() && loc.time - recentSp.first().first > RECENT_WINDOW_MS) recentSp.removeFirst()
+            }
             Prefs.setTripLastFix(ctx, String.format("%.5f, %.5f", loc.latitude, loc.longitude))
+            // Hand the fix straight to the Trip Tracker app on this device (outage-proof live render,
+            // separate from the MQTT->add-on path, which continues unchanged). Explicit + signature-gated.
+            try {
+                val bi = Intent("dev.ajithv.triptracker.LIVE_POINT").setPackage("dev.ajithv.triptracker")
+                bi.putExtra("trip_id", tripId)
+                bi.putExtra("ts", loc.time)
+                bi.putExtra("lat", loc.latitude)
+                bi.putExtra("lon", loc.longitude)
+                if (loc.hasAltitude()) bi.putExtra("alt", loc.altitude)
+                if (!sp.isNaN()) bi.putExtra("speed", sp.toFloat())
+                if (loc.hasAccuracy()) bi.putExtra("acc", loc.accuracy)
+                ctx.sendBroadcast(bi)
+            } catch (e: Exception) { Log.w(TAG, "live broadcast failed: ${e.message}") }
             val payload = o.toString()
             io.execute { enqueue(payload); flush() }
         }
@@ -191,19 +233,42 @@ class TripTracker(
         lastLat = null; lastLon = null
         moving = false; prevFixMs = 0L; lastSentMs = 0L
         if (!hasLocationPermission()) { Log.w(TAG, "location permission not granted — cannot stream"); return }
-        val ms = if (m == "time") interval * 1000L else FAST_SAMPLE_MS
-        val req = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, ms)
+        powerSave = Prefs.tripPowerSave(ctx)
+        reqMoving = true   // start high-accuracy; motion gate drops to low-power once a stop is detected
+        try {
+            fused.removeLocationUpdates(callback)
+            fused.requestLocationUpdates(buildRequest(true), callback, ctx.mainLooper)
+            running = true
+            Log.i(TAG, "trip $id streaming mode=$m dist=${minDist}m interval=${interval}s powerSave=$powerSave")
+            io.execute { flush() }   // drain anything buffered from a prior session/outage
+        } catch (e: Exception) { Log.e(TAG, "requestLocationUpdates failed", e) }
+    }
+
+    /** The location request for the current motion state. Battery-saver + stopped (distance/hybrid) → a
+     *  low-power, coarse request that just notices movement resuming; otherwise 1 Hz precise GPS. */
+    private fun buildRequest(movingNow: Boolean): LocationRequest {
+        if (powerSave && mode != "time" && !movingNow) {
+            return LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, STOPPED_MS)
+                .setMinUpdateIntervalMillis(STOPPED_MS)
+                .build()
+        }
+        val ms = if (mode == "time") intervalS * 1000L else FAST_SAMPLE_MS
+        return LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, ms)
             .setMinUpdateIntervalMillis(ms)
             .setGranularity(Granularity.GRANULARITY_FINE)   // force precise (GPS), never coarse
             .setWaitForAccurateLocation(true)               // wait for an accurate fix, not an early network one
             .build()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun applyRequest(movingNow: Boolean) {
+        if (!running) return
         try {
             fused.removeLocationUpdates(callback)
-            fused.requestLocationUpdates(req, callback, ctx.mainLooper)
-            running = true
-            Log.i(TAG, "trip $id streaming mode=$m dist=${minDist}m interval=${interval}s (sampling ${ms}ms)")
-            io.execute { flush() }   // drain anything buffered from a prior session/outage
-        } catch (e: Exception) { Log.e(TAG, "requestLocationUpdates failed", e) }
+            fused.requestLocationUpdates(buildRequest(movingNow), callback, ctx.mainLooper)
+            reqMoving = movingNow
+            Log.i(TAG, "power-save: switched to ${if (movingNow) "high-accuracy 1Hz" else "low-power/coarse"}")
+        } catch (e: Exception) { Log.e(TAG, "re-request failed", e) }
     }
 
     fun stop() {
@@ -231,7 +296,12 @@ class TripTracker(
     companion object {
         private const val TAG = "TripTracker"
         private const val MAX_ACCURACY_M = 50f     // ignore fixes less accurate than this (metres)
+        private const val OUTLIER_BASE_M = 50.0    // max jump from the last point when near-stationary (metres)
+        private const val OUTLIER_K = 2.0          // recent-speed margin: allow = max(BASE, recent*dt*K)
+        private const val OUTLIER_GAP_S = 20.0     // above this dt it's a data gap, not an outlier — don't gate
+        private const val RECENT_WINDOW_MS = 20000L  // window for the recent-average-speed estimate
         private const val FAST_SAMPLE_MS = 1000L   // distance-mode sampling rate (~1/s)
+        private const val STOPPED_MS = 6000L       // battery-saver sampling rate while stopped (~6 s)
         private const val STOP_MS = 0.6            // m/s: below this = stopped (emit a rest point)
         private const val START_MS = 1.4           // m/s: above this = moving again (hysteresis)
         private const val MEM_MAX = 7200          // ~4 h of points at the observed ~2 s avg gap, then spill to flash

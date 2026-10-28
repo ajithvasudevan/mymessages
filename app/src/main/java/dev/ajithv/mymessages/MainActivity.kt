@@ -487,6 +487,10 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(s: SeekBar) {}
         })
 
+        val swPs = findViewById<androidx.appcompat.widget.SwitchCompat>(R.id.sw_trip_powersave)
+        swPs.isChecked = Prefs.tripPowerSave(this)
+        swPs.setOnCheckedChangeListener { _, c -> Prefs.setTripPowerSave(this, c) }  // applies on the next trip start
+
         val rg = findViewById<RadioGroup>(R.id.rg_trip_mode)
         fun applyMode() {
             val id = rg.checkedRadioButtonId
