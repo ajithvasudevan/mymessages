@@ -157,6 +157,16 @@ class TripTracker(
                 if (!sp.isNaN()) bi.putExtra("speed", sp.toFloat())
                 if (loc.hasAccuracy()) bi.putExtra("acc", loc.accuracy)
                 ctx.sendBroadcast(bi)
+                // Also hand the same fix to the Bus Tracker app on this device (same pattern).
+                val bb = Intent("dev.ajithv.bustracker.LIVE_POINT").setPackage("dev.ajithv.bustracker")
+                bb.putExtra("trip_id", tripId)
+                bb.putExtra("ts", loc.time)
+                bb.putExtra("lat", loc.latitude)
+                bb.putExtra("lon", loc.longitude)
+                if (loc.hasAltitude()) bb.putExtra("alt", loc.altitude)
+                if (!sp.isNaN()) bb.putExtra("speed", sp.toFloat())
+                if (loc.hasAccuracy()) bb.putExtra("acc", loc.accuracy)
+                ctx.sendBroadcast(bb)
             } catch (e: Exception) { Log.w(TAG, "live broadcast failed: ${e.message}") }
             val payload = o.toString()
             io.execute { enqueue(payload); flush() }

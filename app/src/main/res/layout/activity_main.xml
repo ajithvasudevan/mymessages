@@ -201,6 +201,21 @@
                 android:alpha="0.7"
                 android:text="@string/svc_enable_hint" />
 
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/sw_commute"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/commute_loc_enable" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:paddingBottom="4dp"
+                android:alpha="0.7"
+                android:text="@string/commute_loc_hint" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -406,6 +421,35 @@
                 android:layout_marginTop="24dp"
                 android:layout_marginBottom="16dp"
                 android:background="#33000000" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="16dp"
+                android:textStyle="bold"
+                android:text="Watch doorbell (Bluetooth)" />
+            <TextView
+                android:id="@+id/tv_watch_window"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:text="Stream window: 60 s" />
+            <SeekBar
+                android:id="@+id/sk_watch_window"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="58" />
+            <TextView
+                android:id="@+id/tv_watch_cadence"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:text="Frame interval: 2.5 s" />
+            <SeekBar
+                android:id="@+id/sk_watch_cadence"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="14" />
 
             <Button
                 android:id="@+id/btn_restart"

@@ -39,6 +39,8 @@
     <string name="notif_shortcut_label">Notifications</string>
     <string name="svc_enable">Run background service (persistent notification)</string>
     <string name="svc_enable_hint">Needed for lock-screen pop-ups and instant Telegram. Off = no persistent notification; receiving SMS still works.</string>
+    <string name="commute_loc_enable">Broadcast my location (commute)</string>
+    <string name="commute_loc_hint">Streams your live GPS to the Commute dashboard + Bus Tracker map, in the background, until you switch it off (12 h safety cap). A manual override, independent of the automatic evening-trip control.</string>
     <string name="notif_filter_header">Filtered</string>
     <string name="notif_filter_none">Nothing filtered</string>
     <string name="notif_filter_clear">Clear all</string>

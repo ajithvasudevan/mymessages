@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 import android.graphics.Color
 import android.media.RingtoneManager
 import android.net.Uri
@@ -25,6 +27,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.google.android.material.tabs.TabLayout
 import org.json.JSONObject
 
@@ -43,6 +46,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var blockedStats: TextView
     private lateinit var swNotif: SwitchCompat
     private lateinit var swService: SwitchCompat
+    private lateinit var swCommute: SwitchCompat
+    private var suppressCommute = false
     private lateinit var tvFont: TextView
     private lateinit var tvVol: TextView
     private lateinit var tvAutoClose: TextView
@@ -122,6 +127,7 @@ class MainActivity : AppCompatActivity() {
         swBg = findViewById(R.id.sw_bg)
         swFg = findViewById(R.id.sw_fg)
         wireNotifSettings()
+        wireWatchTuning()
 
         findViewById<Button>(R.id.btn_perms).setOnClickListener { requestAllPermissions() }
         findViewById<Button>(R.id.btn_restart).setOnClickListener { startDashService() }
@@ -137,14 +143,31 @@ class MainActivity : AppCompatActivity() {
             else startService(Intent(this, DashService::class.java).setAction(DashService.ACTION_STOP))
         }
 
+        // Manual commute-location broadcast toggle (same stream the Bus Tracker app controls).
+        swCommute = findViewById(R.id.sw_commute)
+        swCommute.setOnCheckedChangeListener { _, on ->
+            if (suppressCommute) return@setOnCheckedChangeListener
+            startService(Intent(this, DashService::class.java)
+                .setAction(DashService.ACTION_COMMUTE_SET).putExtra("on", on))
+        }
+
         startDashService()
     }
 
     override fun onResume() {
         super.onResume()
+        if (::swCommute.isInitialized) { suppressCommute = true; swCommute.isChecked = DashService.commuteManual; suppressCommute = false }
         refresh()
         refreshBlockedStats()
         maybePromptUsageAccess()
+        ContextCompat.registerReceiver(this, watchCfgReceiver,
+            IntentFilter(WatchRelay.ACTION_CFG_UPDATED), ContextCompat.RECEIVER_NOT_EXPORTED)
+        syncWatchTuning()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try { unregisterReceiver(watchCfgReceiver) } catch (_: Exception) {}
     }
 
     /** Blocked-SMS summary for the main screen. Scans the SMS provider for the hidden-message count, so
@@ -651,6 +674,59 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toast(m: String) = android.widget.Toast.makeText(this, m, android.widget.Toast.LENGTH_SHORT).show()
+
+    private lateinit var skWatchWindow: SeekBar
+    private lateinit var tvWatchWindow: TextView
+    private lateinit var skWatchCadence: SeekBar
+    private lateinit var tvWatchCadence: TextView
+
+    private val watchCfgReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, i: Intent?) { syncWatchTuning() }
+    }
+
+    private fun winSec(p: Int) = 10 + p * 5
+    private fun cadSec(p: Int) = 1.0 + p * 0.5
+    private fun fmtCad(v: Double) = if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
+
+    // Watch-doorbell tuning on the Notifications tab. Shared source of truth = the HA input_number
+    // helpers (also edited by the Overview>System dashboard card): the app shows the current value
+    // from the retained lockdash/watch/cfg (via WatchRelay), and a change publishes lockdash/watch/setcfg
+    // -> HA sets the helpers -> re-broadcasts cfg -> both the app and the card resync.
+    private fun wireWatchTuning() {
+        skWatchWindow = findViewById(R.id.sk_watch_window)
+        tvWatchWindow = findViewById(R.id.tv_watch_window)
+        skWatchCadence = findViewById(R.id.sk_watch_cadence)
+        tvWatchCadence = findViewById(R.id.tv_watch_cadence)
+        skWatchWindow.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) { tvWatchWindow.text = "Stream window: " + winSec(p) + " s" }
+            override fun onStartTrackingTouch(sb: SeekBar) {}
+            override fun onStopTrackingTouch(sb: SeekBar) { publishWatchCfg() }
+        })
+        skWatchCadence.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) { tvWatchCadence.text = "Frame interval: " + fmtCad(cadSec(p)) + " s" }
+            override fun onStartTrackingTouch(sb: SeekBar) {}
+            override fun onStopTrackingTouch(sb: SeekBar) { publishWatchCfg() }
+        })
+        syncWatchTuning()
+    }
+
+    private fun syncWatchTuning() {
+        if (!::skWatchWindow.isInitialized) return
+        val wp = ((WatchRelay.windowSec() - 10) / 5).coerceIn(0, 58)
+        val cp = Math.round((WatchRelay.cadenceSec() - 1.0) / 0.5).toInt().coerceIn(0, 14)
+        skWatchWindow.progress = wp; tvWatchWindow.text = "Stream window: " + winSec(wp) + " s"
+        skWatchCadence.progress = cp; tvWatchCadence.text = "Frame interval: " + fmtCad(cadSec(cp)) + " s"
+    }
+
+    private fun publishWatchCfg() {
+        val json = JSONObject()
+            .put("window", winSec(skWatchWindow.progress))
+            .put("cadence", cadSec(skWatchCadence.progress))
+            .toString()
+        startService(Intent(this, DashService::class.java)
+            .setAction(DashService.ACTION_WATCH_SETCFG)
+            .putExtra(DashService.EXTRA_PAYLOAD, json))
+    }
 
     private abstract class SimpleSeek : SeekBar.OnSeekBarChangeListener {
         override fun onStartTrackingTouch(sb: SeekBar?) {}

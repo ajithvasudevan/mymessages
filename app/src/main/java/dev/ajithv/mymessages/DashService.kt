@@ -84,6 +84,10 @@ class DashService : Service() {
         const val ACTION_OPEN_MUSIC = "dev.ajithv.mymessages.OPEN_MUSIC"
         const val ACTION_REQUEST = "dev.ajithv.mymessages.REQUEST"       // extra EXTRA_SCREEN
         const val ACTION_PUBLISH_CMD = "dev.ajithv.mymessages.PUB_CMD"   // extra EXTRA_PAYLOAD
+        const val ACTION_WATCH_SETCFG = "dev.ajithv.mymessages.WATCH_SETCFG"
+        const val ACTION_COMMUTE_SET = "dev.ajithv.mymessages.COMMUTE_SET"   // extra "on": start/stop commute GPS
+        @Volatile var commuteActive = false   // CommuteLoc streaming now? (either source)
+        @Volatile var commuteManual = false   // user's manual override on? (read by MainActivity toggle)
         const val ACTION_UPDATE = "dev.ajithv.mymessages.UPDATE"         // live-screen refresh (EXTRA_PAYLOAD)
         const val EXTRA_SCREEN = "screen"
 
@@ -110,6 +114,8 @@ class DashService : Service() {
     private val base get() = BuildConfig.DEF_BASE_TOPIC
     private val tripBase get() = BuildConfig.DEF_TRIP_TOPIC
     private var trip: TripTracker? = null
+    private var commute: CommuteLoc? = null
+    private var commuteReceiver: android.content.BroadcastReceiver? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
     // Free-text status shown below the notification buttons; set over MQTT (<base>/status).
@@ -150,7 +156,10 @@ class DashService : Service() {
     override fun onCreate() {
         super.onCreate()
         TalkConfig.load(this)   // doorbell-talk audio settings (gain/hpf/ns), updated live over MQTT
+        WatchRelay.loadConfig(this)   // watch-stream tuning (window/cadence), updated live over MQTT
         trip = TripTracker(this, tripBase, { connected }) { t, p -> publish(t, p) }
+        commute = CommuteLoc(this, { onCommuteExpire() }) { t, p -> publish(t, p) }
+        registerCommuteReceiver()
         createChannels()
         // A foreground service MUST post its notification promptly (mandatory when started via
         // startForegroundService), so always startForeground first, then drop it if we're not meant to
@@ -161,6 +170,7 @@ class DashService : Service() {
             connect()
             watchdogHandler.postDelayed(watchdogTick, WATCHDOG_MS)
             trip?.resumeIfActive()   // resume GPS streaming if a trip was active before the restart
+            refreshCommute()   // resume manual override / auto session persisted before the restart
         } else {
             hideOngoing()   // no persistent notification; created only to service a one-off pop
         }
@@ -202,6 +212,8 @@ class DashService : Service() {
             ACTION_OPEN_MUSIC -> openActivity(MusicActivity::class.java, null, respectDisable = false)
             ACTION_REQUEST -> intent.getStringExtra(EXTRA_SCREEN)?.let { publish("$base/request", it) }
             ACTION_PUBLISH_CMD -> intent.getStringExtra(EXTRA_PAYLOAD)?.let { publish("$base/cmd", it) }
+            ACTION_WATCH_SETCFG -> intent.getStringExtra(EXTRA_PAYLOAD)?.let { publish("$base/watch/setcfg", it) }
+            ACTION_COMMUTE_SET -> setCommuteManual(intent.getBooleanExtra("on", false))
             ACTION_START_RING -> startRinging(intent.getStringExtra(EXTRA_PAYLOAD)?.toIntOrNull() ?: RING_DEFAULT_SECS)
             ACTION_STOP_RING -> stopRinging()   // the heads-up "Stop" action, or a manual stop
             ACTION_CLEAR_STATUS -> {        // the "Clear" button on the status line
@@ -278,6 +290,7 @@ class DashService : Service() {
                     updateOngoing()
                     c.subscribe("$base/#", 1)
                     c.subscribe("$tripBase/#", 1)   // Trip Tracker: state/control/track
+                    c.subscribe("commute/control", 1)   // HA/Bus Tracker -> start/stop commute GPS
                     try {
                         c.publish("$base/notif_state",
                             MqttMessage(notifStatePayload().toByteArray()).apply { qos = 1; isRetained = true })
@@ -298,11 +311,13 @@ class DashService : Service() {
                         topic == "$tripBase/state" -> trip?.onState(payload)
                         topic.startsWith("$tripBase/") -> { /* our own trips/track or trips/control echo */ }
                         topic.endsWith("/dismiss") -> broadcastLocal(ACTION_DISMISS, null)
+                        topic == "commute/control" -> runCatching { setCommuteAuto(JSONObject(payload).optBoolean("on", false)) }
                         topic.endsWith("/control") -> handleControl(payload)
                         topic.endsWith("/tg_image") -> handleTgImage(payload)
                         topic.endsWith("/notif_push") -> handleNotifPush(payload)
                         topic.endsWith("/ring") -> handleRing(payload)
                         topic.endsWith("/talkcfg") -> TalkConfig.apply(this@DashService, payload)
+                        topic.endsWith("/watch/cfg") -> WatchRelay.applyConfig(this@DashService, payload)
                         topic.endsWith("/status") -> handleStatus(payload)
                         topic.endsWith("/show") -> dispatch(payload)
                         topic.endsWith("/refresh") -> {
@@ -478,6 +493,7 @@ class DashService : Service() {
             if (km?.isKeyguardLocked != true) { Log.i(TAG, "music push ignored (unlocked)"); return }
         }
         openActivity(target, payload, respectDisable = false)
+        if (screen == "camera") WatchRelay.relayBell(this, ring = true)
     }
 
     private fun publish(topic: String, payload: String) {
@@ -751,8 +767,55 @@ class DashService : Service() {
         getSystemService(NotificationManager::class.java).notify(ONGOING_ID, ongoingNotification())
     }
 
+    /** Commute GPS has two independent, persisted sources (both survive a service restart):
+     *   - MANUAL = the Notifications-tab switch. A true override: streams ANY time (ignores the
+     *     evening-window self-stop) and is NOT stopped by the auto start/stop — only the switch (or
+     *     the 12 h safety cap) turns it off.
+     *   - AUTO = Bus Tracker / HA commute-control / the 16:30 auto-start. Bounded by the evening
+     *     window + 4 h cap and the HA arrival/22:35 autostop.
+     *  Streaming while either is on. CommuteLoc runs inside this foreground service, so it keeps
+     *  going with the UI closed. Interval is the fixed 5 s. */
+    private fun commuteSp() = getSharedPreferences("commute", MODE_PRIVATE)
+    private fun refreshCommute() {
+        val manual = commuteSp().getBoolean("manual", false)
+        val auto = commuteSp().getBoolean("auto", false)
+        val on = manual || auto
+        if (on) commute?.start(5, manual) else commute?.stop()
+        commuteActive = on
+        commuteManual = manual
+    }
+    private fun setCommuteManual(on: Boolean) {
+        try { commuteSp().edit().putBoolean("manual", on).apply() } catch (_: Exception) {}
+        refreshCommute()
+    }
+    private fun setCommuteAuto(on: Boolean, interval: Int = 5) {
+        try { commuteSp().edit().putBoolean("auto", on).apply() } catch (_: Exception) {}
+        refreshCommute()
+    }
+    /** CommuteLoc self-expired (evening window / safety cap) — hard-stop both sources. */
+    private fun onCommuteExpire() {
+        try { commuteSp().edit().putBoolean("manual", false).putBoolean("auto", false).apply() } catch (_: Exception) {}
+        refreshCommute()
+    }
+
+    /** Bus Tracker toggles the commute GPS stream via a signed COMMUTE_LOC broadcast. */
+    private fun registerCommuteReceiver() {
+        val r = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) {
+                setCommuteAuto(i.getBooleanExtra("on", false), i.getIntExtra("interval", 5))
+            }
+        }
+        commuteReceiver = r
+        androidx.core.content.ContextCompat.registerReceiver(this, r,
+            android.content.IntentFilter("dev.ajithv.mymessages.COMMUTE_LOC"),
+            "dev.ajithv.bustracker.permission.LIVE_POINT", null,
+            androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+    }
+
     override fun onDestroy() {
         stopRinging()
+        try { commuteReceiver?.let { unregisterReceiver(it) } } catch (_: Exception) {}
+        commute?.stop()
         watchdogHandler.removeCallbacks(watchdogTick)
         try { client?.disconnectForcibly(500) } catch (_: Exception) {}
         try { client?.close() } catch (_: Exception) {}
