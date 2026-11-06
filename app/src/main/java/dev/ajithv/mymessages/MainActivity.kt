@@ -47,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swNotif: SwitchCompat
     private lateinit var swService: SwitchCompat
     private lateinit var swCommute: SwitchCompat
+    private lateinit var swCommuteAlert: SwitchCompat
     private var suppressCommute = false
     private lateinit var tvFont: TextView
     private lateinit var tvVol: TextView
@@ -150,6 +151,24 @@ class MainActivity : AppCompatActivity() {
             startService(Intent(this, DashService::class.java)
                 .setAction(DashService.ACTION_COMMUTE_SET).putExtra("on", on))
         }
+
+        // Evening-commute "almost home" ring alert (Notifications tab). Phone-local setting; the ETA
+        // arrives from HA over MQTT (lockdash/commute_eta) and DashService rings when eta <= this.
+        swCommuteAlert = findViewById(R.id.sw_commute_alert)
+        swCommuteAlert.isChecked = Prefs.commuteAlertOn(this)
+        swCommuteAlert.setOnCheckedChangeListener { _, on -> Prefs.setCommuteAlertOn(this, on) }
+        val skAlert = findViewById<SeekBar>(R.id.sk_commute_alert)
+        val tvAlert = findViewById<TextView>(R.id.tv_commute_alert)
+        skAlert.max = 60
+        skAlert.progress = Prefs.commuteAlertMin(this).coerceIn(1, 60)
+        tvAlert.text = "${Prefs.commuteAlertMin(this)} min"
+        skAlert.setOnSeekBarChangeListener(object : SimpleSeek() {
+            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                val m = p.coerceAtLeast(1)
+                tvAlert.text = "$m min"
+                if (fromUser) Prefs.setCommuteAlertMin(this@MainActivity, m)
+            }
+        })
 
         startDashService()
     }

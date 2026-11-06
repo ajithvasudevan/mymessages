@@ -216,6 +216,46 @@
                 android:alpha="0.7"
                 android:text="@string/commute_loc_hint" />
 
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/sw_commute_alert"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginTop="12dp"
+                android:text="Ring when almost home" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:paddingBottom="4dp"
+                android:alpha="0.7"
+                android:text="Rings at max volume + vibrates and shows a full-screen Silence button (over the lock screen) when your evening-commute ETA home drops to the minutes below." />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="4dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Minutes from home" />
+                <TextView
+                    android:id="@+id/tv_commute_alert"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="56dp"
+                    android:gravity="end"
+                    android:textStyle="bold"
+                    android:text="10 min" />
+            </LinearLayout>
+            <SeekBar
+                android:id="@+id/sk_commute_alert"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="60" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

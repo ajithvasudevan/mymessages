@@ -94,6 +94,8 @@ class DashService : Service() {
         // --- on-demand ring (find-my-phone) ---
         const val ACTION_START_RING = "dev.ajithv.mymessages.START_RING"
         const val ACTION_STOP_RING = "dev.ajithv.mymessages.STOP_RING"
+        const val ACTION_RING_STOPPED = "dev.ajithv.mymessages.RING_STOPPED"  // ring ended -> RingActivity closes
+        const val EXTRA_MSG = "msg"
         const val ACTION_CLEAR_STATUS = "dev.ajithv.mymessages.CLEAR_STATUS"  // Clear button on the status line
         // Trip Tracker: the Trip tab's buttons publish trips/control; the loop itself is driven by the
         // retained trips/state (see TripTracker). EXTRA_PAYLOAD = trip name, EXTRA_SCREEN = interval (s).
@@ -127,6 +129,7 @@ class DashService : Service() {
     private var ringPrevAlarmVol: Int = -1            // saved alarm-stream volume, restored on stop
     private val ringHandler = Handler(Looper.getMainLooper())
     private val ringTimeout = Runnable { stopRinging() }
+    @Volatile private var commuteAlerted = false     // evening-commute "near home" alert fired this trip
     @Volatile private var ringing = false
 
     // ---- reconnect watchdog ----
@@ -315,6 +318,7 @@ class DashService : Service() {
                         topic.endsWith("/control") -> handleControl(payload)
                         topic.endsWith("/tg_image") -> handleTgImage(payload)
                         topic.endsWith("/notif_push") -> handleNotifPush(payload)
+                        topic.endsWith("/commute_eta") -> handleCommuteEta(payload)
                         topic.endsWith("/ring") -> handleRing(payload)
                         topic.endsWith("/talkcfg") -> TalkConfig.apply(this@DashService, payload)
                         topic.endsWith("/watch/cfg") -> WatchRelay.applyConfig(this@DashService, payload)
@@ -582,6 +586,15 @@ class DashService : Service() {
         } catch (e: Exception) { Log.w(TAG, "wakeup lock failed: ${e.message}") }
     }
 
+    /** Signed on-device broadcast to the Bus Tracker app so its map hides the ETA at home (no HTTP).
+     *  Same signature-gated channel as the LIVE_POINT GPS broadcast (bustracker holds the perm). */
+    private fun broadcastCommuteHome(home: Boolean) {
+        try {
+            sendBroadcast(Intent("dev.ajithv.bustracker.COMMUTE_HOME")
+                .setPackage("dev.ajithv.bustracker").putExtra("home", home))
+        } catch (e: Exception) { Log.w(TAG, "commute-home bcast: ${e.message}") }
+    }
+
     private fun broadcastLocal(action: String, payload: String?) {
         val i = Intent(action).setPackage(packageName)
         if (payload != null) i.putExtra(EXTRA_PAYLOAD, payload)
@@ -596,6 +609,23 @@ class DashService : Service() {
                 MqttMessage(notifStatePayload().toByteArray()).apply { qos = 1; isRetained = true })
             Log.i(TAG, "publish(retained) $base/notif_state = '${notifStatePayload()}'")
         } catch (e: Exception) { Log.w(TAG, "notif_state publish failed: ${e.message}") }
+    }
+
+    // ---- evening-commute "almost home" alert ----
+
+    /** `<base>/commute_eta`: HA publishes {eta_minutes:<int, -1 = no active trip>}. When the
+     *  Notifications-tab alert is on and the live ETA home has dropped to the user threshold, ring +
+     *  launch the full-screen RingActivity (once per trip; re-armed when eta goes -1 or back above). */
+    private fun handleCommuteEta(payload: String) {
+        val o = try { JSONObject(payload) } catch (e: Exception) { return }
+        broadcastCommuteHome(o.optBoolean("at_home", false))   // tell Bus Tracker (map hides its ETA at home)
+        if (!Prefs.commuteAlertOn(this)) return
+        val eta = o.optInt("eta_minutes", -1)
+        if (eta < 0) { commuteAlerted = false; return }          // no active trip -> armed
+        if (eta > Prefs.commuteAlertMin(this)) { commuteAlerted = false; return }  // not near yet -> armed
+        if (commuteAlerted) return                               // already alerted this approach
+        commuteAlerted = true
+        startRinging(600, "Almost home \u2014 $eta min away")   // rings up to 10 min until Silence
     }
 
     // ---- on-demand ring (find-my-phone) ----
@@ -617,7 +647,7 @@ class DashService : Service() {
     /** Max the alarm stream, loop the default ringtone (fallback alarm/notification) through the ALARM
      *  usage, vibrate, wake the screen, and post a HIGH heads-up with a Stop action. Idempotent while
      *  ringing (re-arms the auto-stop timer). */
-    private fun startRinging(secs: Int) {
+    private fun startRinging(secs: Int, ringMsg: String? = null) {
         ringHandler.removeCallbacks(ringTimeout)
         wakeScreen()
         try {
@@ -644,11 +674,24 @@ class DashService : Service() {
             } catch (e: Exception) { Log.e(TAG, "ring player: ${e.message}") }
         }
         startVibrate()
+        launchRingActivity(ringMsg)
         ringing = true
         try { getSystemService(NotificationManager::class.java).notify(RING_ID, ringNotification()) }
         catch (e: Exception) { Log.w(TAG, "ring notify: ${e.message}") }
         ringHandler.postDelayed(ringTimeout, secs.toLong().coerceIn(5, 600) * 1000L)
         Log.i(TAG, "ringing (${secs}s)")
+    }
+
+    /** Pop the full-screen red SILENCE screen over the lock screen / any app. Mirrors openActivity
+     *  (works from the background via the app's SYSTEM_ALERT_WINDOW grant); the ring notification's
+     *  full-screen intent is the locked-device fallback. */
+    private fun launchRingActivity(msg: String?) {
+        try {
+            startActivity(Intent(this, RingActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                if (msg != null) putExtra(EXTRA_MSG, msg)
+            })
+        } catch (e: Exception) { Log.w(TAG, "ring activity: ${e.message}") }
     }
 
     private fun stopRinging() {
@@ -664,6 +707,7 @@ class DashService : Service() {
         } catch (e: Exception) { Log.w(TAG, "ring restore vol: ${e.message}") }
         ringPrevAlarmVol = -1
         try { getSystemService(NotificationManager::class.java).cancel(RING_ID) } catch (_: Exception) {}
+        broadcastLocal(ACTION_RING_STOPPED, null)
         Log.i(TAG, "ring stopped")
     }
 
@@ -680,11 +724,15 @@ class DashService : Service() {
 
     private fun ringNotification(): Notification {
         val stopPI = servicePI(ACTION_STOP_RING, 130)
+        val fsPI = PendingIntent.getActivity(this, 131,
+            Intent(this, RingActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, RING_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_dash)
             .setContentTitle("MyMessages is ringing")
             .setContentText("Tap Stop to silence")
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(fsPI, true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)

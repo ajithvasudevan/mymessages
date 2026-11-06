@@ -133,6 +133,17 @@
             android:exported="false"
             android:label="@string/notif_filter_header" />
 
+        <!-- Full-screen red SILENCE screen for the commute "almost home" ring (over the lock screen). -->
+        <activity
+            android:name=".RingActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ajithv.mymessages.task.ring"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Dash.Camera" />
+
         <!-- Notification-overlay substring/regex filters (see NotifFilterRepo). -->
         <activity
             android:name=".NotifFilterListActivity"
