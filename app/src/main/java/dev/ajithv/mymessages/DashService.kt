@@ -423,16 +423,28 @@ class DashService : Service() {
                 val isEdit = o.optBoolean("edit", false)
                 val existing = Prefs.messageRowTs(this, pkg, ts, title)
                 if (existing != null) {
-                    val changed = text.isNotEmpty() && Prefs.updateRowText(this, existing, text)
-                    if (urls.isNotEmpty()) attachUrlImageToRow(existing, urls.first())
-                    else if (changed) sendBroadcast(Intent(NotifListener.ACTION_IMG_UPDATED)
-                        .setPackage(packageName).putExtra(NotifListener.EXTRA_TS, existing))
-                    // A Telegram EDIT that actually changed the text: re-surface the SAME message now —
-                    // update the live overlay if it's showing this row, or pop it to the front if not —
-                    // instead of silently swapping the text in the background. Gated like a fresh pop, but
+                    val textChanged = text.isNotEmpty() && Prefs.updateRowText(this, existing, text)
+                    var mediaChanged = false
+                    if (isEdit && urls.isNotEmpty()) {
+                        // An edit can also swap the picture(s) — a single photo, or any photo in an album
+                        // (which arrives here as the full current set). Drop the row's images and re-fetch
+                        // the new set so the overlay shows the edited picture(s), not the stale one.
+                        Prefs.clearRowImages(this, existing)
+                        for (u in urls) fetchAndAppendImage(existing, u)
+                        mediaChanged = true
+                    } else if (urls.isNotEmpty()) {
+                        attachUrlImageToRow(existing, urls.first())        // non-edit: late image fill (attach-if-empty)
+                    } else if (textChanged) {
+                        sendBroadcast(Intent(NotifListener.ACTION_IMG_UPDATED)
+                            .setPackage(packageName).putExtra(NotifListener.EXTRA_TS, existing))
+                    }
+                    // A Telegram EDIT that changed the text OR the picture(s): re-surface the SAME message
+                    // now — update the live overlay if it's showing this row, or pop it to the front if not
+                    // — instead of silently swapping it in the background. Gated like a fresh pop, but
                     // judged fresh by the EDIT time (the original ts may be minutes old). EXTRA_FOCUS makes
                     // the visible overlay jump to this row even if a newer notification has since arrived.
-                    if (isEdit && changed) {
+                    // Text-only, no-change edits (e.g. a link-preview appearing) never reach here.
+                    if (isEdit && (textChanged || mediaChanged)) {
                         val editTs = o.optLong("edit_ts", ts)
                         val stale = System.currentTimeMillis() - editTs > 60_000L
                         if (!stale && !Prefs.globalDisabled(this) && Prefs.notifEnabled(this) &&

@@ -18,8 +18,8 @@ android {
         applicationId "dev.ajithv.mymessages"
         minSdk 27            // API 27: setShowWhenLocked / setTurnScreenOn available
         targetSdk 34
-        versionCode 87
-        versionName "r88-tg-edit-inplace"
+        versionCode 88
+        versionName "r89-tg-edit-allkinds"
 
         // libVLC (CameraActivity RTSP) ships native .so per-ABI; the phone is arm64.
         ndk { abiFilters 'arm64-v8a' }
