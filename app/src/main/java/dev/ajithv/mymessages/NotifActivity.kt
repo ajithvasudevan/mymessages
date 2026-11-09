@@ -72,6 +72,9 @@ class NotifActivity : Activity() {
     companion object {
         const val TAG = "NotifActivity"
         const val SCREEN = "notif"
+        // ACTION_IMG_UPDATED extra: jump to (and keep showing) this ts even if it isn't the newest row —
+        // used to re-surface an EDITED Telegram message immediately.
+        const val EXTRA_FOCUS = "focus"
         const val COMMIT_FRACTION = 0.2f // drag >= 20% of the pane to move to the next/prev message
         const val SETTLE_MS = 200L       // spring-to-rest animation after release
         @Volatile var visible = false
@@ -126,7 +129,8 @@ class NotifActivity : Activity() {
     // A late-arriving MessagingStyle image (Telegram) was attached to a history row — refresh if shown.
     private val imgReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
-            onImageUpdated(i?.getLongExtra(NotifListener.EXTRA_TS, 0L) ?: 0L)
+            onImageUpdated(i?.getLongExtra(NotifListener.EXTRA_TS, 0L) ?: 0L,
+                i?.getBooleanExtra(EXTRA_FOCUS, false) ?: false)
         }
     }
 
@@ -1132,7 +1136,7 @@ class NotifActivity : Activity() {
      * row we're currently showing, refresh in place; otherwise (an image filled on some other older row)
      * ignore. This keeps the content AND the index/total in sync on every successive message.
      */
-    private fun onImageUpdated(ts: Long) {
+    private fun onImageUpdated(ts: Long, focus: Boolean = false) {
         if (previewMode || ts <= 0L) return
         val fresh = Prefs.history(this)
             .filter { !Prefs.isItemHidden(this, it.optString("pkg"), it.optString("app"), it.optString("category"), it.optString("title"), it.optString("text")) }
@@ -1140,6 +1144,13 @@ class NotifActivity : Activity() {
         if (fresh.isEmpty()) return
         val curTs = items.getOrNull(idx)?.optLong("ts") ?: -1L
         val isNewest = ts == fresh.last().optLong("ts")
+        // Edited-message re-surface: jump to this row even if a newer notification arrived since, and
+        // re-render in place if it's already the one on screen; reset the auto-close so it can be read.
+        if (focus) {
+            val target = fresh.indexOfLast { it.optLong("ts") == ts }
+            if (target >= 0) { items = fresh; idx = target; renderCurrent(); scheduleAutoClose() }
+            return
+        }
         if (!isNewest && ts != curTs) return
         items = fresh
         idx = if (isNewest) fresh.lastIndex

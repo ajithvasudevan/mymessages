@@ -420,12 +420,30 @@ class DashService : Service() {
         if (ts <= 0L) return
         Thread {
             try {
+                val isEdit = o.optBoolean("edit", false)
                 val existing = Prefs.messageRowTs(this, pkg, ts, title)
                 if (existing != null) {
                     val changed = text.isNotEmpty() && Prefs.updateRowText(this, existing, text)
                     if (urls.isNotEmpty()) attachUrlImageToRow(existing, urls.first())
                     else if (changed) sendBroadcast(Intent(NotifListener.ACTION_IMG_UPDATED)
                         .setPackage(packageName).putExtra(NotifListener.EXTRA_TS, existing))
+                    // A Telegram EDIT that actually changed the text: re-surface the SAME message now —
+                    // update the live overlay if it's showing this row, or pop it to the front if not —
+                    // instead of silently swapping the text in the background. Gated like a fresh pop, but
+                    // judged fresh by the EDIT time (the original ts may be minutes old). EXTRA_FOCUS makes
+                    // the visible overlay jump to this row even if a newer notification has since arrived.
+                    if (isEdit && changed) {
+                        val editTs = o.optLong("edit_ts", ts)
+                        val stale = System.currentTimeMillis() - editTs > 60_000L
+                        if (!stale && !Prefs.globalDisabled(this) && Prefs.notifEnabled(this) &&
+                            !Prefs.isItemHidden(this, pkg, app, category, title, text) && shouldPopOverlay()) {
+                            openActivity(NotifActivity::class.java,
+                                JSONObject().put("screen", NotifActivity.SCREEN).put("ts", existing).toString())
+                            sendBroadcast(Intent(NotifListener.ACTION_IMG_UPDATED)
+                                .setPackage(packageName).putExtra(NotifListener.EXTRA_TS, existing)
+                                .putExtra(NotifActivity.EXTRA_FOCUS, true))
+                        }
+                    }
                     return@Thread
                 }
                 Prefs.addHistory(this, app, pkg, category, title, text, ts, ts, "ub") { "" }
