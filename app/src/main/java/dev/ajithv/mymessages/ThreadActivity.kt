@@ -9,10 +9,15 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.Spannable
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
 import android.text.style.BackgroundColorSpan
+import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
+import android.text.style.URLSpan
+import android.text.util.Linkify
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -201,18 +206,53 @@ class ThreadActivity : AppCompatActivity() {
         }
     }
 
-    /** Highlight every case-insensitive occurrence of [q] in [text] (yellow bg, black text). */
-    private fun highlight(text: String, q: String): CharSequence {
-        val s = SpannableString(text)
-        if (q.isEmpty()) return s
-        val lo = text.lowercase(); val ql = q.lowercase()
-        var i = lo.indexOf(ql)
-        while (i >= 0) {
-            s.setSpan(BackgroundColorSpan(0xFFFFF176.toInt()), i, i + q.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            s.setSpan(ForegroundColorSpan(Color.BLACK), i, i + q.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            i = lo.indexOf(ql, i + q.length)
+    /**
+     * Set a bubble's body text: turn any web URL into a tappable span that opens the link inside
+     * LockDash's own [LinkWebActivity] (same convention as the notification overlay), and apply the
+     * optional case-insensitive search highlight [q] (yellow bg, black text) on top. The link
+     * movement method is attached only when a link is actually present, so ordinary (link-free)
+     * bubbles keep their long-press-to-delete and scroll behavior unchanged.
+     */
+    private fun setLinkifiedBody(tv: TextView, text: String, q: String) {
+        val sp = SpannableStringBuilder(text)
+        if (q.isNotEmpty()) {
+            val lo = text.lowercase(); val ql = q.lowercase()
+            var i = lo.indexOf(ql)
+            while (i >= 0) {
+                sp.setSpan(BackgroundColorSpan(0xFFFFF176.toInt()), i, i + q.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                sp.setSpan(ForegroundColorSpan(Color.BLACK), i, i + q.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                i = lo.indexOf(ql, i + q.length)
+            }
         }
-        return s
+        var hasLink = false
+        try {
+            Linkify.addLinks(sp, Linkify.WEB_URLS)
+            for (u in sp.getSpans(0, sp.length, URLSpan::class.java)) {
+                val st = sp.getSpanStart(u); val en = sp.getSpanEnd(u); val fl = sp.getSpanFlags(u)
+                val url = u.url
+                sp.removeSpan(u)
+                sp.setSpan(object : ClickableSpan() {
+                    override fun onClick(widget: View) = openLink(url)
+                    override fun updateDrawState(ds: TextPaint) { ds.isUnderlineText = true }  // keep the white bubble-text colour
+                }, st, en, fl)
+                hasLink = true
+            }
+        } catch (_: Exception) {}
+        tv.text = sp
+        tv.movementMethod = if (hasLink) LinkMovementMethod.getInstance() else null
+        tv.highlightColor = Color.TRANSPARENT
+    }
+
+    /** Open a tapped SMS link inside LockDash's own in-app WebView (its own task), matching how the
+     *  notification overlay handles links, rather than handing the URL to the system browser. */
+    private fun openLink(url: String) {
+        try {
+            startActivity(Intent(this, LinkWebActivity::class.java)
+                .putExtra(LinkWebActivity.EXTRA_URL, url)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: Exception) {
+            Toast.makeText(this, "Can't open link", Toast.LENGTH_SHORT).show()
+        }
     }
 
     /** Cheap — reads the pre-resolved [addressBlocked] flag; no content query (the isBlocked lookup
@@ -275,8 +315,9 @@ class ThreadActivity : AppCompatActivity() {
         }
         val bodyText = if (m.body.isNotEmpty()) m.body else if (m.isMms && m.imagePartIds.isNotEmpty()) "" else if (m.isMms) "[MMS]" else ""
         if (bodyText.isNotEmpty()) bubble.addView(TextView(this).apply {
-            text = if (m.id == highlightId && highlightQuery.isNotEmpty()) highlight(bodyText, highlightQuery) else bodyText
             setTextColor(Color.WHITE); textSize = base + 2f; maxWidth = cap
+            val hl = if (m.id == highlightId) highlightQuery else ""
+            setLinkifiedBody(this, bodyText, hl)
         })
         bubble.addView(TextView(this).apply {
             text = SmsRepo.fmtTime(m.date); textSize = (base - 3f).coerceAtLeast(9f)
