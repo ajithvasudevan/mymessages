@@ -1,6 +1,8 @@
 package dev.ajithv.mymessages
 
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -8,6 +10,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.text.SpannableStringBuilder
 import android.text.Spannable
@@ -324,8 +327,28 @@ class ThreadActivity : AppCompatActivity() {
             setTextColor(0xFFCCCCCC.toInt()); gravity = Gravity.END
         })
         wrap.addView(bubble)
-        wrap.setOnLongClickListener { confirmDeleteMessage(m); true }
+        wrap.setOnLongClickListener { showMessageMenu(m); true }
         return wrap
+    }
+
+    /** Long-press on a bubble → a menu (Copy the message text / Delete the message), instead of
+     *  jumping straight to the delete confirmation. Copy is omitted for a bodyless MMS (image only). */
+    private fun showMessageMenu(m: SmsRepo.Message) {
+        val hasText = m.body.isNotEmpty()
+        val labels = if (hasText) arrayOf("Copy", "Delete") else arrayOf("Delete")
+        AlertDialog.Builder(this)
+            .setItems(labels) { _, which ->
+                if (hasText && which == 0) copyText(m.body) else confirmDeleteMessage(m)
+            }
+            .show()
+    }
+
+    private fun copyText(text: String) {
+        val cb = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cb.setPrimaryClip(ClipData.newPlainText("message", text))
+        // Android 13+ shows its own copy confirmation; don't double up with a Toast there.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
+            Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show()
     }
 
     private fun confirmDeleteMessage(m: SmsRepo.Message) {
